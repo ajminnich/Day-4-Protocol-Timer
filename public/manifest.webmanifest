@@ -1,0 +1,19 @@
+{
+  "name": "Day 4 Protocol Timer",
+  "short_name": "D4 Timer",
+  "description": "A responsive cycling protocol timer for laboratory Day 4 power protocols.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07111d",
+  "theme_color": "#07111d",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

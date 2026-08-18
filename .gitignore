@@ -1,3 +1,42 @@
+# Day 4 web app dependencies and generated output
+node_modules/
+.pnpm-store/
+.next/
+.vinext/
+dist/
+pages-dist/
+coverage/
+*.tsbuildinfo
+
+# Local Cloudflare / Sites runtime state
+.wrangler/
+
+# Local web-app logs and temporary files
+*.log
+*.tmp
+tmp/
+
+# Local environment files (keep a shareable example if one is added)
+.env
+.env.*
+!.env.example
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Optional starter examples are not part of the Day 4 timer
+examples/
+app/chatgpt-auth.ts
+db/
+drizzle/
+drizzle.config.ts
+public/file.svg
+public/globe.svg
+public/window.svg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -179,3 +218,8 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# This project keeps its small Sites packaging helper in build/.
+!build/
+build/*
+!build/sites-vite-plugin.ts
