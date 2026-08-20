@@ -40,7 +40,7 @@ The direct folder lookup is intentionally local because a hosted browser page ca
 - A color-coded power-over-time line graph with a live position marker
 - The compressed interval schedule from the loaded CSV
 
-The timer uses the browser's high-resolution clock, so brief rendering delays or a background tab do not make the protocol drift. It also requests a screen wake lock while running when the browser supports it.
+The timer is anchored to the computer's wall clock when **Start** or **Resume** is pressed. It saves the loaded protocol, current interval, and absolute interval deadline on this device. If the browser closes or the computer loses power, reopening the timer restores the protocol at the position the wall clock says it should have reached. A deliberately paused timer stays paused after a restart. It also requests a screen wake lock while running when the browser supports it.
 
 ## Extra warmup
 

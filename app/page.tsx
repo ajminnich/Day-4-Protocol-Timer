@@ -24,6 +24,56 @@ type WakeLockSentinelLike = {
 };
 
 const EXTRA_WARMUP_SECONDS = 5 * 60;
+const TIMER_STORAGE_KEY = "day4-protocol-timer-state-v1";
+
+type StoredTimerState = {
+  version: 1;
+  sourceName: string;
+  segments: Segment[];
+  baseProtocol: Segment[];
+  currentIndex: number;
+  remainingMs: number;
+  status: TimerStatus;
+  intervalEndEpochMs: number | null;
+};
+
+function isValidSegment(value: unknown): value is Segment {
+  if (!value || typeof value !== "object") return false;
+  const segment = value as Partial<Segment>;
+  return (
+    typeof segment.id === "string" &&
+    Number.isFinite(segment.duration) &&
+    (segment.duration ?? 0) > 0 &&
+    Number.isFinite(segment.power) &&
+    (segment.power ?? -1) >= 0 &&
+    (segment.extension === undefined || typeof segment.extension === "boolean")
+  );
+}
+
+function readStoredTimerState(): StoredTimerState | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY) ?? "null") as
+      | Partial<StoredTimerState>
+      | null;
+    if (
+      !parsed ||
+      parsed.version !== 1 ||
+      !Array.isArray(parsed.segments) ||
+      parsed.segments.length === 0 ||
+      !parsed.segments.every(isValidSegment) ||
+      !Array.isArray(parsed.baseProtocol) ||
+      !parsed.baseProtocol.every(isValidSegment) ||
+      !Number.isInteger(parsed.currentIndex) ||
+      !Number.isFinite(parsed.remainingMs) ||
+      !["ready", "running", "paused", "complete"].includes(parsed.status ?? "")
+    ) {
+      return null;
+    }
+    return parsed as StoredTimerState;
+  } catch {
+    return null;
+  }
+}
 
 function cloneSegments(segments: Segment[]) {
   return segments.map((segment) => ({ ...segment }));
@@ -420,6 +470,7 @@ export default function Home() {
   const participantInputRef = useRef<HTMLInputElement>(null);
   const segmentsRef = useRef(segments);
   const baseProtocolRef = useRef<Segment[]>([]);
+  const sourceNameRef = useRef(sourceName);
   const currentIndexRef = useRef(0);
   const remainingMsRef = useRef(remainingMs);
   const statusRef = useRef<TimerStatus>(status);
@@ -471,6 +522,28 @@ export default function Home() {
     statusRef.current = nextStatus;
     setStatus(nextStatus);
   }, []);
+
+  const persistTimerState = useCallback(
+    (overrides: Partial<StoredTimerState> = {}) => {
+      try {
+        const snapshot: StoredTimerState = {
+          version: 1,
+          sourceName: sourceNameRef.current,
+          segments: cloneSegments(segmentsRef.current),
+          baseProtocol: cloneSegments(baseProtocolRef.current),
+          currentIndex: currentIndexRef.current,
+          remainingMs: remainingMsRef.current,
+          status: statusRef.current,
+          intervalEndEpochMs: endAtRef.current,
+          ...overrides,
+        };
+        localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(snapshot));
+      } catch {
+        // The timer still works if private browsing or storage policy blocks persistence.
+      }
+    },
+    [],
+  );
 
   const releaseWakeLock = useCallback(async () => {
     if (!wakeLockRef.current) return;
@@ -545,9 +618,15 @@ export default function Home() {
     setRemainingMs(nextRemaining);
     countdownSecondRef.current = null;
     setTimerStatus("ready");
+    persistTimerState({
+      currentIndex: 0,
+      remainingMs: nextRemaining,
+      status: "ready",
+      intervalEndEpochMs: null,
+    });
     setNotice("Timer reset. The loaded protocol and warmup changes are preserved.");
     void releaseWakeLock();
-  }, [releaseWakeLock, setTimerStatus]);
+  }, [persistTimerState, releaseWakeLock, setTimerStatus]);
 
   const startTimer = useCallback(async () => {
     if (statusRef.current === "running") return;
@@ -564,26 +643,34 @@ export default function Home() {
     }
 
     await ensureAudio();
-    endAtRef.current = performance.now() + remainingMsRef.current;
+    // Date.now() ties the protocol to the computer's wall clock, which survives a reboot.
+    endAtRef.current = Date.now() + remainingMsRef.current;
     countdownSecondRef.current = null;
     setTimerStatus("running");
+    persistTimerState({ status: "running", intervalEndEpochMs: endAtRef.current });
     setNotice("Timer running. Keep the current power centered on the display.");
     void requestWakeLock();
-  }, [ensureAudio, requestWakeLock, setTimerStatus]);
+  }, [ensureAudio, persistTimerState, requestWakeLock, setTimerStatus]);
 
   const pauseTimer = useCallback(() => {
     if (statusRef.current !== "running") return;
+    const now = Date.now();
     const nextRemaining = Math.max(
       0,
-      (endAtRef.current ?? performance.now()) - performance.now(),
+      (endAtRef.current ?? now) - now,
     );
     remainingMsRef.current = nextRemaining;
     setRemainingMs(nextRemaining);
     endAtRef.current = null;
     setTimerStatus("paused");
+    persistTimerState({
+      remainingMs: nextRemaining,
+      status: "paused",
+      intervalEndEpochMs: null,
+    });
     setNotice("Paused. Start resumes from this exact point.");
     void releaseWakeLock();
-  }, [releaseWakeLock, setTimerStatus]);
+  }, [persistTimerState, releaseWakeLock, setTimerStatus]);
 
   const skipInterval = useCallback(() => {
     if (segmentsRef.current.length === 0) {
@@ -595,6 +682,13 @@ export default function Home() {
       remainingMsRef.current = 0;
       setRemainingMs(0);
       setTimerStatus("complete");
+      endAtRef.current = null;
+      persistTimerState({
+        currentIndex: currentIndexRef.current,
+        remainingMs: 0,
+        status: "complete",
+        intervalEndEpochMs: null,
+      });
       setNotice("Protocol complete.");
       void playTone(1046, 0.45, 0.16);
       void releaseWakeLock();
@@ -608,11 +702,16 @@ export default function Home() {
     setRemainingMs(nextRemaining);
     countdownSecondRef.current = null;
     if (statusRef.current === "running") {
-      endAtRef.current = performance.now() + nextRemaining;
+      endAtRef.current = Date.now() + nextRemaining;
     }
+    persistTimerState({
+      currentIndex: nextIndex,
+      remainingMs: nextRemaining,
+      intervalEndEpochMs: endAtRef.current,
+    });
     setNotice(`Moved to interval ${nextIndex + 1}.`);
     void playTone(880, 0.14, 0.13);
-  }, [playTone, releaseWakeLock, setTimerStatus]);
+  }, [persistTimerState, playTone, releaseWakeLock, setTimerStatus]);
 
   const applyProtocol = useCallback(
     (nextSegments: Segment[], name: string, message: string) => {
@@ -620,6 +719,7 @@ export default function Home() {
       segmentsRef.current = cleanSegments;
       baseProtocolRef.current = cloneSegments(cleanSegments);
       setSegments(cleanSegments);
+      sourceNameRef.current = name;
       setSourceName(name);
       currentIndexRef.current = 0;
       setCurrentIndex(0);
@@ -628,10 +728,19 @@ export default function Home() {
       endAtRef.current = null;
       countdownSecondRef.current = null;
       setTimerStatus("ready");
+      persistTimerState({
+        sourceName: name,
+        segments: cleanSegments,
+        baseProtocol: cleanSegments,
+        currentIndex: 0,
+        remainingMs: cleanSegments[0].duration * 1000,
+        status: "ready",
+        intervalEndEpochMs: null,
+      });
       setNotice(message);
       void releaseWakeLock();
     },
-    [releaseWakeLock, setTimerStatus],
+    [persistTimerState, releaseWakeLock, setTimerStatus],
   );
 
   const loadCsvFile = useCallback(
@@ -757,7 +866,8 @@ export default function Home() {
 
     segmentsRef.current = nextSegments;
     setSegments(nextSegments);
-  }, []);
+    persistTimerState({ segments: nextSegments });
+  }, [persistTimerState]);
 
   const restoreLoadedProtocol = useCallback(() => {
     const restored = cloneSegments(baseProtocolRef.current);
@@ -774,9 +884,16 @@ export default function Home() {
     endAtRef.current = null;
     countdownSecondRef.current = null;
     setTimerStatus("ready");
+    persistTimerState({
+      segments: restored,
+      currentIndex: 0,
+      remainingMs: restored[0].duration * 1000,
+      status: "ready",
+      intervalEndEpochMs: null,
+    });
     setNotice(`Restored ${sourceName} and removed all added warmup time.`);
     void releaseWakeLock();
-  }, [releaseWakeLock, setTimerStatus, sourceName]);
+  }, [persistTimerState, releaseWakeLock, setTimerStatus, sourceName]);
 
   const toggleSound = useCallback(async () => {
     const nextValue = !soundEnabledRef.current;
@@ -812,6 +929,72 @@ export default function Home() {
   }, [segments]);
 
   useEffect(() => {
+    sourceNameRef.current = sourceName;
+  }, [sourceName]);
+
+  useEffect(() => {
+    const stored = readStoredTimerState();
+    if (!stored) return;
+
+    const restoredSegments = cloneSegments(stored.segments);
+    let restoredIndex = Math.min(stored.currentIndex, restoredSegments.length - 1);
+    let restoredRemaining = Math.max(0, stored.remainingMs);
+    let restoredStatus = stored.status;
+    let restoredEnd = stored.intervalEndEpochMs;
+
+    if (restoredStatus === "running") {
+      const now = Date.now();
+      if (!Number.isFinite(restoredEnd)) {
+        restoredEnd = now + restoredRemaining;
+      }
+      while (restoredEnd !== null && restoredEnd <= now) {
+        restoredIndex += 1;
+        if (restoredIndex >= restoredSegments.length) {
+          restoredIndex = restoredSegments.length - 1;
+          restoredRemaining = 0;
+          restoredStatus = "complete";
+          restoredEnd = null;
+          break;
+        }
+        restoredEnd += restoredSegments[restoredIndex].duration * 1000;
+      }
+      if (restoredEnd !== null) restoredRemaining = Math.max(0, restoredEnd - now);
+    }
+
+    segmentsRef.current = restoredSegments;
+    baseProtocolRef.current = cloneSegments(
+      stored.baseProtocol.length > 0 ? stored.baseProtocol : restoredSegments,
+    );
+    sourceNameRef.current = stored.sourceName || "Recovered protocol";
+    currentIndexRef.current = restoredIndex;
+    remainingMsRef.current = restoredRemaining;
+    endAtRef.current = restoredEnd;
+    statusRef.current = restoredStatus;
+    setSegments(restoredSegments);
+    setSourceName(sourceNameRef.current);
+    setCurrentIndex(restoredIndex);
+    setRemainingMs(restoredRemaining);
+    setStatus(restoredStatus);
+    setNotice(
+      restoredStatus === "running"
+        ? "Recovered the active protocol from the computer clock. It remained on schedule while this page was closed."
+        : restoredStatus === "complete"
+          ? "Recovered the protocol. It completed while the computer was off."
+          : `Recovered the ${restoredStatus} protocol from this computer.`,
+    );
+    persistTimerState({
+      sourceName: sourceNameRef.current,
+      segments: restoredSegments,
+      baseProtocol: baseProtocolRef.current,
+      currentIndex: restoredIndex,
+      remainingMs: restoredRemaining,
+      status: restoredStatus,
+      intervalEndEpochMs: restoredEnd,
+    });
+    if (restoredStatus === "running") void requestWakeLock();
+  }, [persistTimerState, requestWakeLock]);
+
+  useEffect(() => {
     soundEnabledRef.current = soundEnabled;
   }, [soundEnabled]);
 
@@ -819,7 +1002,7 @@ export default function Home() {
     if (status !== "running") return;
 
     const tick = () => {
-      const now = performance.now();
+      const now = Date.now();
       let nextRemaining = (endAtRef.current ?? now) - now;
       let index = currentIndexRef.current;
 
@@ -829,6 +1012,12 @@ export default function Home() {
           setRemainingMs(0);
           endAtRef.current = null;
           setTimerStatus("complete");
+          persistTimerState({
+            currentIndex: index,
+            remainingMs: 0,
+            status: "complete",
+            intervalEndEpochMs: null,
+          });
           setNotice("Protocol complete. Great work.");
           void playTone(1046, 0.5, 0.17);
           void releaseWakeLock();
@@ -843,6 +1032,11 @@ export default function Home() {
         endAtRef.current = scheduledEnd;
         nextRemaining = scheduledEnd - now;
         countdownSecondRef.current = null;
+        persistTimerState({
+          currentIndex: index,
+          remainingMs: nextRemaining,
+          intervalEndEpochMs: scheduledEnd,
+        });
         void playTone(880, 0.16, 0.14);
       }
 
@@ -863,7 +1057,7 @@ export default function Home() {
     tick();
     const timer = window.setInterval(tick, 100);
     return () => window.clearInterval(timer);
-  }, [playTone, releaseWakeLock, setTimerStatus, status]);
+  }, [persistTimerState, playTone, releaseWakeLock, setTimerStatus, status]);
 
   useEffect(() => {
     const handleVisibility = () => {

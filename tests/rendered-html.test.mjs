@@ -62,6 +62,12 @@ test("ships the expected protocol and CSV safeguards", async () => {
   assert.match(page, /nextSegments\.splice\(index \+ 1, 0/);
   assert.match(page, /\/api\/local-protocol\?participant=/);
   assert.match(page, /function ProtocolLineChart/);
+  assert.match(page, /day4-protocol-timer-state-v1/);
+  assert.match(page, /localStorage\.setItem\(TIMER_STORAGE_KEY/);
+  assert.match(page, /endAtRef\.current = Date\.now\(\) \+ remainingMsRef\.current/);
+  assert.match(page, /const stored = readStoredTimerState\(\)/);
+  assert.match(page, /while \(restoredEnd !== null && restoredEnd <= now\)/);
+  assert.doesNotMatch(page, /endAtRef\.current = performance\.now/);
   assert.match(page, /Power over time/);
   assert.match(page, /Tabata effort \$\{effortNumber\} of \$\{totalEfforts\}/);
   assert.match(page, /tabata-effort-label/);
