@@ -34,7 +34,7 @@ test("server-renders the Day 4 protocol timer", async () => {
   assert.match(html, /<title>Day 4 Protocol Timer<\/title>/i);
   assert.match(html, /Time left at current power/);
   assert.match(html, /Next interval/);
-  assert.match(html, /Add 5:00 at 50 W/);
+  assert.match(html, /Add 2:00 at 50 W/);
   assert.match(html, /Load participant protocol/);
   assert.match(html, /No protocol loaded/);
   assert.match(html, /Day 4\/Zwift Files/);
@@ -52,7 +52,7 @@ test("ships the expected protocol and CSV safeguards", async () => {
   );
   const packageJson = await readFile(new URL("../package.json", import.meta.url), "utf8");
 
-  assert.match(page, /const EXTRA_WARMUP_SECONDS = 5 \* 60/);
+  assert.match(page, /const EXTRA_WARMUP_SECONDS = 2 \* 60/);
   assert.match(page, /useState<Segment\[\]>\(\[\]\)/);
   assert.doesNotMatch(page, /BUILT_IN_PROTOCOL|initialProtocol|p6-\$\{/);
   assert.match(page, /headers\.indexOf\("time_s"\)/);

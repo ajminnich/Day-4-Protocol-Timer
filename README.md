@@ -44,10 +44,10 @@ The timer is anchored to the computer's wall clock when **Start** or **Resume** 
 
 ## Extra warmup
 
-Use **Add 5:00 at 50 W** before the participant-specific main set.
+Use **Add 2:00 at 50 W** before the participant-specific main set.
 
-- If the current interval is already 50 W, its remaining time is extended by exactly five minutes.
-- Otherwise, a new five-minute 50 W interval is placed immediately after the current interval.
+- If the current interval is already 50 W, its remaining time is extended by exactly two minutes.
+- Otherwise, a new two-minute 50 W interval is placed immediately after the current interval.
 - The button can be used repeatedly.
 - **Remove added warmup** restores the originally loaded protocol.
 

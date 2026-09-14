@@ -23,7 +23,7 @@ type WakeLockSentinelLike = {
   release: () => Promise<void>;
 };
 
-const EXTRA_WARMUP_SECONDS = 5 * 60;
+const EXTRA_WARMUP_SECONDS = 2 * 60;
 const TIMER_STORAGE_KEY = "day4-protocol-timer-state-v1";
 
 type StoredTimerState = {
@@ -853,7 +853,7 @@ export default function Home() {
       }
       remainingMsRef.current += EXTRA_WARMUP_SECONDS * 1000;
       setRemainingMs(remainingMsRef.current);
-      setNotice("Added 5:00 to the current 50 W warmup interval.");
+      setNotice("Added 2:00 to the current 50 W warmup interval.");
     } else {
       nextSegments.splice(index + 1, 0, {
         id: `extension-${crypto.randomUUID()}`,
@@ -861,7 +861,7 @@ export default function Home() {
         power: 50,
         extension: true,
       });
-      setNotice("Queued an extra 5:00 at 50 W immediately after this interval.");
+      setNotice("Queued an extra 2:00 at 50 W immediately after this interval.");
     }
 
     segmentsRef.current = nextSegments;
@@ -1249,7 +1249,7 @@ export default function Home() {
             <p className="eyebrow">On-the-fly control</p>
             <h2>Need more warmup?</h2>
             <p>
-              Adds five minutes at 50 W. During a 50 W interval it extends the
+              Adds two minutes at 50 W. During a 50 W interval it extends the
               clock; otherwise it queues the block next.
             </p>
             <button
@@ -1259,7 +1259,7 @@ export default function Home() {
               disabled={!canAddWarmup}
             >
               <span aria-hidden="true">+</span>
-              Add 5:00 at 50 W
+              Add 2:00 at 50 W
             </button>
             {hasProtocol && !canAddWarmup && status !== "complete" && (
               <p className="lock-note">Locked during the participant-specific main set.</p>
