@@ -66,17 +66,31 @@ time_s,power_W
 
 ## Run locally
 
-For normal use, double-click:
+On macOS, double-click:
+
+```text
+Start Day 4 Timer.command
+```
+
+The Mac launcher finds Node.js and pnpm in the usual Homebrew locations or the bundled Codex runtime. If either is missing, it displays setup instructions. The first launch installs the dependencies for your Mac, including native packages that cannot be copied from Windows. This step needs internet access; later launches reuse the installation.
+
+On Windows, double-click:
 
 ```text
 Start Day 4 Timer.bat
 ```
 
-The launcher opens the browser automatically. Keep its command window open while using the timer, then press `Ctrl+C` when finished.
+The launcher opens the browser automatically. Keep its Terminal or command window open while using the timer, then press `Ctrl+C` when finished. Opening the launcher again opens the timer if it is already running.
+
+If macOS reports that the launcher is not executable, run this once in Terminal from the timer folder:
+
+```sh
+chmod +x "Start Day 4 Timer.command"
+```
 
 For manual startup, use Node.js 22.13 or newer and pnpm:
 
-```powershell
+```sh
 pnpm install
 pnpm dev
 ```
